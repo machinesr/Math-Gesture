@@ -1,20 +1,21 @@
 export type Question = {
-    a: number
-    b: number
-    answer: number
-  }
-  
-  export function generateQuestion(): Question {
-  
-    // pick first number 0–10
-    const a = Math.floor(Math.random() * 11)
-  
-    // second number limited so total ≤ 10
-    const b = Math.floor(Math.random() * (11 - a))
-  
-    return {
-      a,
-      b,
-      answer: a + b
-    }
-  }
+  a: number
+  b: number
+  answer: number
+}
+
+export function generateQuestion(prevAnswer?: number): Question {
+
+  // choose answer first (1–10)
+  let answer: number
+
+  do {
+    answer = Math.floor(Math.random() * 10) + 1
+  } while (answer === prevAnswer)
+
+  // generate numbers that sum to the answer
+  const a = Math.floor(Math.random() * (answer + 1))
+  const b = answer - a
+
+  return { a, b, answer }
+}

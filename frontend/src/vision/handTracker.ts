@@ -12,8 +12,8 @@ export function initHandTracker(videoElement, onResults) {
   hands.setOptions({
     maxNumHands: 2,
     modelComplexity: 1,
-    minDetectionConfidence: 0.3,
-    minTrackingConfidence: 0.3
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
   })
 
   hands.onResults(onResults)
@@ -25,7 +25,7 @@ export function initHandTracker(videoElement, onResults) {
       }
     },
     width: 640,
-    height: 480
+    height: 360
   })
 
   camera.start()

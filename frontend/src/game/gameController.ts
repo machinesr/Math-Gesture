@@ -1,13 +1,29 @@
 import { generateQuestion } from "./questionGenerator"
 import { HoldDetector } from "./holdDetector"
 import type { Question } from "./questionGenerator"
+
 export class GameController {
 
-  private holdDetector = new HoldDetector(2000)
+  private bossHp = 200
+  private maxBossHp = 250
+  private damagePerHit = 10
 
-  private question: Question = generateQuestion()
+  private holdDetector = new HoldDetector(1000)
+
+  private lastAnswer: number | undefined
+
+  private question: Question
 
   private lastLocked = false
+
+  private result: "correct" | "wrong" | null = null
+
+  private feedbackEnd = 0
+
+  constructor() {
+    this.question = generateQuestion()
+    this.lastAnswer = this.question.answer
+  }
 
   getQuestion() {
     return this.question
@@ -15,19 +31,44 @@ export class GameController {
 
   update(number: number | null) {
 
+    const now = performance.now()
+
     const hold = this.holdDetector.update(number)
 
-    let result: "correct" | "wrong" | null = null
+    let event: "attack" | null = null
 
-    if (hold.locked && !this.lastLocked) {
+    const justLocked = hold.locked && !this.lastLocked
+
+    if (justLocked) {
 
       if (hold.number === this.question.answer) {
-        result = "correct"
+        this.result = "correct"
+        event = "attack"
+
+        // remove this later waktu connect backend
+        this.bossHp -= this.damagePerHit
+        if (this.bossHp < 0) this.bossHp = 0
+        //
+
+        // nanti something like this
+        
+        // socket.emit("damage_monster", {
+        // pin,
+        // damage: 1
+        // })
+
       } else {
-        result = "wrong"
+        this.result = "wrong"
       }
 
-      this.question = generateQuestion()
+      this.feedbackEnd = now + 700
+    }
+
+    if (this.result && now > this.feedbackEnd) {
+      this.result = null
+
+      this.question = generateQuestion(this.lastAnswer)
+      this.lastAnswer = this.question.answer
     }
 
     this.lastLocked = hold.locked
@@ -36,8 +77,11 @@ export class GameController {
       holdProgress: hold.progress,
       currentNumber: hold.number,
       locked: hold.locked,
-      result,
-      question: this.question
+      result: this.result,
+      question: this.question,
+      event,
+      bossHp:this.bossHp,
+      maxBossHp: this.maxBossHp
     }
   }
 }
