@@ -4,15 +4,26 @@ import type { Question } from "./questionGenerator"
 
 export class GameController {
 
-  private holdDetector = new HoldDetector(2000)
+  private bossHp = 200
+  private maxBossHp = 250
+  private damagePerHit = 10
 
-  private question: Question = generateQuestion()
+  private holdDetector = new HoldDetector(1000)
+
+  private lastAnswer: number | undefined
+
+  private question: Question
 
   private lastLocked = false
 
   private result: "correct" | "wrong" | null = null
 
   private feedbackEnd = 0
+
+  constructor() {
+    this.question = generateQuestion()
+    this.lastAnswer = this.question.answer
+  }
 
   getQuestion() {
     return this.question
@@ -24,7 +35,6 @@ export class GameController {
 
     const hold = this.holdDetector.update(number)
 
-    // NEW: event output
     let event: "attack" | null = null
 
     const justLocked = hold.locked && !this.lastLocked
@@ -34,17 +44,31 @@ export class GameController {
       if (hold.number === this.question.answer) {
         this.result = "correct"
         event = "attack"
+
+        // remove this later waktu connect backend
+        this.bossHp -= this.damagePerHit
+        if (this.bossHp < 0) this.bossHp = 0
+        //
+
+        // nanti something like this
+        
+        // socket.emit("damage_monster", {
+        // pin,
+        // damage: 1
+        // })
+
       } else {
         this.result = "wrong"
       }
 
-      // keep feedback visible for 700ms
       this.feedbackEnd = now + 700
     }
 
     if (this.result && now > this.feedbackEnd) {
       this.result = null
-      this.question = generateQuestion()
+
+      this.question = generateQuestion(this.lastAnswer)
+      this.lastAnswer = this.question.answer
     }
 
     this.lastLocked = hold.locked
@@ -55,7 +79,9 @@ export class GameController {
       locked: hold.locked,
       result: this.result,
       question: this.question,
-      event
+      event,
+      bossHp:this.bossHp,
+      maxBossHp: this.maxBossHp
     }
   }
 }
