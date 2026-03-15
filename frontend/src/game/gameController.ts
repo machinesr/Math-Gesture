@@ -1,6 +1,7 @@
 import { generateQuestion } from "./questionGenerator"
 import { HoldDetector } from "./holdDetector"
 import type { Question } from "./questionGenerator"
+
 export class GameController {
 
   private holdDetector = new HoldDetector(2000)
@@ -19,35 +20,42 @@ export class GameController {
 
   update(number: number | null) {
 
-  const now = performance.now()
+    const now = performance.now()
 
-  const hold = this.holdDetector.update(number)
+    const hold = this.holdDetector.update(number)
 
-  if (hold.locked && !this.lastLocked) {
+    // NEW: event output
+    let event: "attack" | null = null
 
-    if (hold.number === this.question.answer) {
-      this.result = "correct"
-    } else {
-      this.result = "wrong"
+    const justLocked = hold.locked && !this.lastLocked
+
+    if (justLocked) {
+
+      if (hold.number === this.question.answer) {
+        this.result = "correct"
+        event = "attack"
+      } else {
+        this.result = "wrong"
+      }
+
+      // keep feedback visible for 700ms
+      this.feedbackEnd = now + 700
     }
 
-    // keep feedback visible for 700ms
-    this.feedbackEnd = now + 700
-  }
+    if (this.result && now > this.feedbackEnd) {
+      this.result = null
+      this.question = generateQuestion()
+    }
 
-  if (this.result && now > this.feedbackEnd) {
-    this.result = null
-    this.question = generateQuestion()
-  }
+    this.lastLocked = hold.locked
 
-  this.lastLocked = hold.locked
-
-  return {
-    holdProgress: hold.progress,
-    currentNumber: hold.number,
-    locked: hold.locked,
-    result: this.result,
-    question: this.question
+    return {
+      holdProgress: hold.progress,
+      currentNumber: hold.number,
+      locked: hold.locked,
+      result: this.result,
+      question: this.question,
+      event
+    }
   }
-}
 }

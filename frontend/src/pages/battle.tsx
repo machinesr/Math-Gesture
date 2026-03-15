@@ -17,6 +17,17 @@ export default function Battle() {
 
   const handleNumber = useCallback((num: number) => {
      const newState = game.update(num)
+
+      if (newState.event === "attack") {
+      console.log("ATTACK TRIGGERED")
+    }
+    
+      if (newState.result === "wrong") {
+      console.log("WRONG ANSWER")
+    }
+
+    
+
      setState(newState)
   }, [])
 
