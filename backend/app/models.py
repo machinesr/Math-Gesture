@@ -6,6 +6,7 @@ class Player(BaseModel):
     nickname: str
     score: int=0
     combo_multiplier: int=1
+    is_ready: bool = False
     
 class Room(BaseModel):
     pin: str

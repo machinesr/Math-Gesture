@@ -4,6 +4,7 @@ import Battle from "../pages/battle"
 import LandingPage from "../pages/landingpage"
 import Map from "../pages/map"
 import WinScreen from "../pages/winscreen"
+import Lobby from "../pages/lobby"
 
 export default function AppRouter() {
   return (
@@ -14,6 +15,8 @@ export default function AppRouter() {
         <Route path="/LandingPage" element={<LandingPage />} />
         <Route path="/Map" element={<Map />} />
         <Route path="/WinScreen" element={<WinScreen />} />
+        <Route path="/Lobby" element={<Lobby />} />
+
   
 
       </Routes>
