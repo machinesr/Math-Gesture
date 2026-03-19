@@ -20,3 +20,4 @@ class Room(BaseModel):
     current_stage: int = 1
     shared_monster_hp: int=0
     shared_monster_max_hp: int=0
+    start_time: float = 0.0

@@ -78,14 +78,14 @@ export default function Map() {
             value={step === "code" ? roomCode : username}
             onChange={(e) => step === "code" ? setRoomCode(e.target.value) : setUsername(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleNextStep()}
-            // Using ! to force the text size without changing box height
+     
             className="w-full border-2 border-gray-100 rounded-2xl py-5 px-8 text-center text-gray-400 !text-3xl font-semibold placeholder-gray-200 outline-none focus:border-gray-200 transition-colors disabled:opacity-50"
           />
 
           <button
             onClick={handleNextStep}
             disabled={loading}
-            // !text-4xl forces the font size while py-6 keeps the box height original
+         
             className="w-full bg-[#111] text-white rounded-2xl py-6 !text-3xl font-bold hover:bg-black active:scale-[0.98] transition-all disabled:bg-gray-400 h-20"
           >
             {loading ? "loading..." : "enter"}

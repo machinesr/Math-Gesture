@@ -3,14 +3,14 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { socket } from "../network/socket"
 
 import bg  from "../assets/lobbybg.png"
-import lv1 from "../assets/castlebg.png"
+import lv3 from "../assets/castlebg.png"
 import lv2 from "../assets/graveyardbg.png"
-import lv3 from "../assets/terracebg.png"
-import lv4 from "../assets/cavebg.png"
+import lv4 from "../assets/terracebg.png"
+import lv1 from "../assets/cavebg.png"
 import lv5 from "../assets/throneroombg.png"
 
-import p1 from "../assets/blue.png"
-import p2 from "../assets/red.png"
+import p2 from "../assets/blue.png"
+import p1 from "../assets/red.png"
 import p3 from "../assets/green.png"
 import p4 from "../assets/pink.png"
 
@@ -65,9 +65,8 @@ export default function Map() {
 
   useEffect(() => { roomDataRef.current = roomData }, [roomData])
 
-  // 1. SYNCING & SOCKET LISTENERS
+
   useEffect(() => {
-    // FORCE SYNC: Ensure the second player (and everyone else) has the full lobby data
     if (roomData?.pin) {
       const myNickname = localStorage.getItem("nickname") || "Player";
       socket.emit("join_room", { 
@@ -90,7 +89,7 @@ export default function Map() {
     }
   }, [roomData?.pin]);
 
-  // 2. MOVEMENT TRIGGER
+
   useEffect(() => {
     if (!roomData || animating) return;
 
@@ -111,7 +110,7 @@ export default function Map() {
     }
   }, [roomData?.current_stage, animating, isTimerActive]);
 
-  // 3. COUNTDOWN TIMER
+
   useEffect(() => {
     if (!isTimerActive) return;
 
@@ -125,7 +124,7 @@ export default function Map() {
     return () => clearInterval(interval);
   }, [isTimerActive]);
 
-  // 4. NAVIGATION WATCHER
+
   useEffect(() => {
     if (countdown === 0 && isTimerActive) {
         navigate("/Battle", { state: { roomData: roomDataRef.current } });

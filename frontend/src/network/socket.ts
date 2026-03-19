@@ -1,3 +1,11 @@
-import { io } from "socket.io-client"
+import { io } from "socket.io-client";
 
-export const socket = io("http://localhost:8000")
+const currentHost = window.location.hostname; 
+
+
+const SOCKET_URL = `http://${currentHost}:8000`; 
+
+export const socket = io(SOCKET_URL, {
+  transports: ["websocket"],
+  autoConnect: true,
+});

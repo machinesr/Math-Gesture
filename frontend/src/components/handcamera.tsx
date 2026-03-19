@@ -17,7 +17,7 @@ export default function HandCamera({ onNumberDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   
-  // Refs to handle the hardware/AI instances
+
   const handsRef = useRef<any>(null)
   const cameraRef = useRef<any>(null)
   const callbackRef = useRef(onNumberDetected)
@@ -32,11 +32,10 @@ export default function HandCamera({ onNumberDetected }: Props) {
     let isMounted = true
 
     const startHandTracker = async () => {
-      // 1. Give the browser a moment to clear the Stage 1 GPU/Camera session
       await new Promise(resolve => setTimeout(resolve, 300));
       if (!isMounted || !videoRef.current) return;
 
-      // 2. Initialize MediaPipe Hands
+  
       const hands = new Hands({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
       })
@@ -51,7 +50,7 @@ export default function HandCamera({ onNumberDetected }: Props) {
       hands.onResults((results: any) => {
         if (!isMounted) return
         
-        // Mark UI as loaded once we get the first real landmarks
+       
         if (!isLoaded && results.multiHandLandmarks) setIsLoaded(true)
 
         if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
@@ -74,7 +73,7 @@ export default function HandCamera({ onNumberDetected }: Props) {
         if (detectedHands > 0) callbackRef.current(total)
       })
 
-      // 3. Wait for Models to actually load before starting camera
+
       try {
         await hands.initialize()
         handsRef.current = hands
@@ -82,14 +81,14 @@ export default function HandCamera({ onNumberDetected }: Props) {
         console.error("AI Initialization failed:", err)
       }
 
-      // 4. Start Camera
+  
       const camera = new Camera(videoRef.current, {
         onFrame: async () => {
           if (videoRef.current && videoRef.current.readyState >= 2 && handsRef.current) {
             try {
               await handsRef.current.send({ image: videoRef.current })
             } catch (e) {
-              // Ignore errors during route transitions
+           
             }
           }
         },
@@ -107,7 +106,7 @@ export default function HandCamera({ onNumberDetected }: Props) {
       console.log("Stage Transition: Killing Hand Tracker...")
       isMounted = false
       
-      // Hardware Cleanup
+
       if (cameraRef.current) {
         cameraRef.current.stop()
       }
@@ -115,7 +114,7 @@ export default function HandCamera({ onNumberDetected }: Props) {
         handsRef.current.close()
       }
     }
-  }, []) // Mount-only
+  }, []) 
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-black aspect-video w-full shadow-2xl border border-white/10">

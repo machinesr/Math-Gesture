@@ -4,7 +4,7 @@ import { socket } from "../network/socket";
 import PlayerCharacter from "../components/playermodelleft";
 import ReadyButton from "../components/ReadyButton";
 
-// Assets
+
 import red from "../assets/red.png";
 import blue from "../assets/blue.png";
 import purple from "../assets/pink.png"; 
@@ -22,19 +22,19 @@ export default function Lobby() {
       setRoomData(data);
     });
 
-    // Unified Start Logic
+   
     const handleStartSequence = (data: any) => {
-      // 1. Update the state to trigger "Starting Game..." text & green glow
+
       setIsStarting(true);
       
-      // 2. Start the 3-second hype timer
+  
       setTimeout(() => {
-        // 3. Navigate to /map (passing the latest data)
+   
         navigate("/Map", { state: { roomData: data || roomData } }); 
       }, 3000);
     };
 
-    // Listen for the backend signals
+    
     socket.on("all_players_ready", handleStartSequence);
     socket.on("game_started", handleStartSequence);
 

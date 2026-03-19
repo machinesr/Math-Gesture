@@ -18,7 +18,7 @@ export function initHandTracker(videoElement, onResults) {
 
   const camera = new Camera(videoElement, {
     onFrame: async () => {
-      // Logic check: only send if the camera hasn't been stopped
+ 
       if (videoElement.readyState >= 2) {
         try {
           await hands.send({ image: videoElement })
@@ -33,7 +33,7 @@ export function initHandTracker(videoElement, onResults) {
 
   camera.start()
 
-  // --- THE FIX: Return cleanup function ---
+
   return () => {
     console.log("Shutting down MediaPipe Camera and Hands...");
     camera.stop();
