@@ -63,22 +63,29 @@ async def create_room(sid, data):
 
 @sio.event
 async def join_room(sid, data):
-    # Ensure pin is treated as a string immediately
     pin = str(data.get("pin", "1234"))
-    nickname = data.get("nickname", "Guest")
     
     if pin not in active_rooms:
         await sio.emit("error", {"message": "Room not found!"}, to=sid)
         return
 
     room = active_rooms[pin]
-    room.players[sid] = Player(nickname=nickname, session_id=sid)
+
+    # --- THE FIX: Don't overwrite existing players ---
+    if sid not in room.players:
+        # Only create a new player if they aren't already in the room
+        nickname = data.get("nickname", "Player")
+        room.players[sid] = Player(nickname=nickname, session_id=sid)
+        print(f"New User {nickname} joined room {pin}.")
+    else:
+        # Player is already in the dictionary, just log the re-sync
+        print(f"User {room.players[sid].nickname} re-synced with room {pin}.")
     
+    # Put them in the socket room (required for broadcasts)
     await sio.enter_room(sid, pin)
     
-    
+    # Send the full room data back so everyone stays synced
     await sio.emit("lobby_updated", room.model_dump(), room=pin)
-    print(f"User {nickname} joined room {pin}.")
     
 async def game_timer_task(pin:str):
     room = active_rooms.get(pin)

@@ -1,5 +1,6 @@
-import { useRef, useEffect } from "react"
-import { initHandTracker } from "../vision/handTracker"
+import { useRef, useEffect, useState } from "react"
+import { Hands } from "@mediapipe/hands"
+import { Camera } from "@mediapipe/camera_utils"
 import { countFingers } from "../vision/fingerCounter"
 import { FingerStabilizer } from "../vision/fingerStabilizer"
 
@@ -13,10 +14,12 @@ const stabilizers = [
 ]
 
 export default function HandCamera({ onNumberDetected }: Props) {
-
   const videoRef = useRef<HTMLVideoElement | null>(null)
-
-  // store latest callback without restarting camera
+  const [isLoaded, setIsLoaded] = useState(false)
+  
+  // Refs to handle the hardware/AI instances
+  const handsRef = useRef<any>(null)
+  const cameraRef = useRef<any>(null)
   const callbackRef = useRef(onNumberDetected)
 
   useEffect(() => {
@@ -26,47 +29,108 @@ export default function HandCamera({ onNumberDetected }: Props) {
   useEffect(() => {
     if (!videoRef.current) return
 
-    const handleResults = (results: any) => {
+    let isMounted = true
 
-      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-        stabilizers.forEach(s => s.reset?.())
-        return
-      }
+    const startHandTracker = async () => {
+      // 1. Give the browser a moment to clear the Stage 1 GPU/Camera session
+      await new Promise(resolve => setTimeout(resolve, 300));
+      if (!isMounted || !videoRef.current) return;
 
-      let total = 0
-      let detectedHands = 0
-
-      results.multiHandLandmarks.forEach((hand: any, i: number) => {
-
-        const handedness = results.multiHandedness?.[i]?.label
-
-        const fingers = countFingers(hand, handedness)
-
-        const stable = stabilizers[i]?.update(fingers)
-
-        if (stable !== null) {
-          total += stable
-          detectedHands++
-        }
-
+      // 2. Initialize MediaPipe Hands
+      const hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
       })
 
-      if (detectedHands > 0) {
-        callbackRef.current(total)
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6
+      })
+
+      hands.onResults((results: any) => {
+        if (!isMounted) return
+        
+        // Mark UI as loaded once we get the first real landmarks
+        if (!isLoaded && results.multiHandLandmarks) setIsLoaded(true)
+
+        if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+          stabilizers.forEach(s => s.reset?.())
+          return
+        }
+
+        let total = 0
+        let detectedHands = 0
+        results.multiHandLandmarks.forEach((hand: any, i: number) => {
+          const handedness = results.multiHandedness?.[i]?.label
+          const fingers = countFingers(hand, handedness)
+          const stable = stabilizers[i]?.update(fingers)
+          if (stable !== null) {
+            total += stable
+            detectedHands++
+          }
+        })
+
+        if (detectedHands > 0) callbackRef.current(total)
+      })
+
+      // 3. Wait for Models to actually load before starting camera
+      try {
+        await hands.initialize()
+        handsRef.current = hands
+      } catch (err) {
+        console.error("AI Initialization failed:", err)
       }
 
+      // 4. Start Camera
+      const camera = new Camera(videoRef.current, {
+        onFrame: async () => {
+          if (videoRef.current && videoRef.current.readyState >= 2 && handsRef.current) {
+            try {
+              await handsRef.current.send({ image: videoRef.current })
+            } catch (e) {
+              // Ignore errors during route transitions
+            }
+          }
+        },
+        width: 640,
+        height: 360
+      })
+
+      camera.start()
+      cameraRef.current = camera
     }
 
-    initHandTracker(videoRef.current, handleResults)
+    startHandTracker()
 
-  }, []) // run only once
+    return () => {
+      console.log("Stage Transition: Killing Hand Tracker...")
+      isMounted = false
+      
+      // Hardware Cleanup
+      if (cameraRef.current) {
+        cameraRef.current.stop()
+      }
+      if (handsRef.current) {
+        handsRef.current.close()
+      }
+    }
+  }, []) // Mount-only
 
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      style={{ width: "640px", transform: "scaleX(-1)" }}
-    />
+    <div className="relative overflow-hidden rounded-xl bg-black aspect-video w-full shadow-2xl border border-white/10">
+      {!isLoaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/80 backdrop-blur-md z-10">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        </div>
+      )}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="w-full h-full object-cover"
+        style={{ transform: "scaleX(-1)" }}
+      />
+    </div>
   )
 }

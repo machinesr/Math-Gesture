@@ -1,9 +1,7 @@
-
 import { Hands } from "@mediapipe/hands"
 import { Camera } from "@mediapipe/camera_utils"
 
 export function initHandTracker(videoElement, onResults) {
-
   const hands = new Hands({
     locateFile: (file) =>
       `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -20,8 +18,13 @@ export function initHandTracker(videoElement, onResults) {
 
   const camera = new Camera(videoElement, {
     onFrame: async () => {
+      // Logic check: only send if the camera hasn't been stopped
       if (videoElement.readyState >= 2) {
-        await hands.send({ image: videoElement })
+        try {
+          await hands.send({ image: videoElement })
+        } catch (e) {
+          console.warn("Hands send cancelled or failed:", e)
+        }
       }
     },
     width: 640,
@@ -29,4 +32,11 @@ export function initHandTracker(videoElement, onResults) {
   })
 
   camera.start()
+
+  // --- THE FIX: Return cleanup function ---
+  return () => {
+    console.log("Shutting down MediaPipe Camera and Hands...");
+    camera.stop();
+    hands.close();
+  }
 }

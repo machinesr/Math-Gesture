@@ -30,7 +30,7 @@ export default function Lobby() {
       // 2. Start the 3-second hype timer
       setTimeout(() => {
         // 3. Navigate to /map (passing the latest data)
-        navigate("/Battle", { state: { roomData: data || roomData } }); 
+        navigate("/Map", { state: { roomData: data || roomData } }); 
       }, 3000);
     };
 

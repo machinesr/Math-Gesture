@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import { socket } from "../network/socket"
 
 import bg  from "../assets/lobbybg.png"
 import lv1 from "../assets/castlebg.png"
@@ -26,21 +28,13 @@ const NODES = [
 const NODE_SIZE = 120  
 const NODE_R    = NODE_SIZE / 2  
 
-function getLinePoints(
-  ax: number, ay: number,
-  bx: number, by: number,
-  gapPct: number, totalW: number, totalH: number
-) {
-  const apx = ax / 100 * totalW
-  const apy = ay / 100 * totalH
-  const bpx = bx / 100 * totalW
-  const bpy = by / 100 * totalH
-  const dx  = bpx - apx
-  const dy  = bpy - apy
-  const len = Math.sqrt(dx * dx + dy * dy)
-  const ux  = dx / len
-  const uy  = dy / len
-  const gap = NODE_R + 8  
+function getLinePoints(ax: number, ay: number, bx: number, by: number, totalW: number, totalH: number) {
+  const apx = ax / 100 * totalW; const apy = ay / 100 * totalH;
+  const bpx = bx / 100 * totalW; const bpy = by / 100 * totalH;
+  const dx = bpx - apx; const dy = bpy - apy;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const ux = dx / len; const uy = dy / len;
+  const gap = NODE_R + 8;
   return {
     x1: `${ax + (ux * gap / totalW * 100)}%`,
     y1: `${ay + (uy * gap / totalH * 100)}%`,
@@ -50,170 +44,171 @@ function getLinePoints(
 }
 
 export default function Map() {
-  const [currentLevel, setCurrentLevel] = useState(1)
-  const [countdown, setCountdown]       = useState(10)
-  const [animating, setAnimating]       = useState(false)
-  const [allDone, setAllDone]           = useState(false)
-  const [playerXY, setPlayerXY]         = useState({ x: 18, y: 58 })
+  const location = useLocation()
+  const navigate = useNavigate()
 
+  const initialRoomData = location.state?.roomData || null;
+  const currentStageNum = initialRoomData?.current_stage || 1;
+  const startVisualNodeIdx = currentStageNum > 1 ? currentStageNum - 2 : 0;
+
+  const [roomData, setRoomData] = useState<any>(initialRoomData)
+  const [countdown, setCountdown] = useState(5)
+  const [playerXY, setPlayerXY] = useState({ 
+    x: NODES[startVisualNodeIdx].x, 
+    y: NODES[startVisualNodeIdx].y 
+  })
+  const [animating, setAnimating] = useState(false)
+  const [isTimerActive, setIsTimerActive] = useState(false)
+
+  const visualStageRef = useRef<number>(currentStageNum > 1 ? currentStageNum - 1 : 1)
+  const roomDataRef = useRef<any>(roomData)
+
+  useEffect(() => { roomDataRef.current = roomData }, [roomData])
+
+  // 1. SYNCING & SOCKET LISTENERS
   useEffect(() => {
-    if (countdown <= 0) return
-    const t = setInterval(() => {
-      setCountdown(p => {
-        if (p <= 1) { clearInterval(t); return 0 }
-        return p - 1
-      })
-    }, 1000)
-    return () => clearInterval(t)
-  }, [])
+    // FORCE SYNC: Ensure the second player (and everyone else) has the full lobby data
+    if (roomData?.pin) {
+      const myNickname = localStorage.getItem("nickname") || "Player";
+      socket.emit("join_room", { 
+        pin: roomData.pin.toString(),
+        nickname: myNickname 
+      });
+    }
 
-  function animateToNext(fromLevel: number) {
-    if (fromLevel > 5) {
-      setAllDone(true)
-      return
+    const onUpdate = (data: any) => {
+      console.log("Map synced with latest room data:", data);
+      setRoomData(data);
+    };
+
+    socket.on("lobby_updated", onUpdate);
+    socket.on("stage_advanced", onUpdate);
+
+    return () => {
+      socket.off("lobby_updated", onUpdate);
+      socket.off("stage_advanced", onUpdate);
     }
-    if (fromLevel === 5) {
-      setCurrentLevel(6)
-      setAllDone(true)
-      return
+  }, [roomData?.pin]);
+
+  // 2. MOVEMENT TRIGGER
+  useEffect(() => {
+    if (!roomData || animating) return;
+
+    const currentStage = roomData.current_stage || 1;
+
+    if (currentStage > visualStageRef.current) {
+        setIsTimerActive(false); 
+        const t = setTimeout(() => {
+            animateToNext(visualStageRef.current, currentStage);
+            visualStageRef.current = currentStage;
+        }, 600);
+        return () => clearTimeout(t);
+    } 
+    else if (!animating && !isTimerActive) {
+        const node = NODES[currentStage - 1];
+        setPlayerXY({ x: node.x, y: node.y });
+        setIsTimerActive(true);
     }
-    setAnimating(true)
-    const from  = NODES[fromLevel - 1]
-    const to    = NODES[fromLevel]
-    const start = performance.now()
+  }, [roomData?.current_stage, animating, isTimerActive]);
+
+  // 3. COUNTDOWN TIMER
+  useEffect(() => {
+    if (!isTimerActive) return;
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isTimerActive]);
+
+  // 4. NAVIGATION WATCHER
+  useEffect(() => {
+    if (countdown === 0 && isTimerActive) {
+        navigate("/Battle", { state: { roomData: roomDataRef.current } });
+    }
+  }, [countdown, isTimerActive, navigate]);
+
+  function animateToNext(fromIdx: number, toIdx: number) {
+    setAnimating(true);
+    const from = NODES[fromIdx - 1];
+    const to = NODES[toIdx - 1];
+    const startTime = performance.now();
+
     function step(now: number) {
-      const p = Math.min((now - start) / 1200, 1)
-      setPlayerXY({ x: from.x + (to.x - from.x) * p, y: from.y + (to.y - from.y) * p })
-      if (p < 1) {
-        requestAnimationFrame(step)
+      const progress = Math.min((now - startTime) / 1500, 1);
+      setPlayerXY({
+        x: from.x + (to.x - from.x) * progress,
+        y: from.y + (to.y - from.y) * progress
+      });
+      if (progress < 1) {
+        requestAnimationFrame(step);
       } else {
-        const next = fromLevel + 1
-        setCurrentLevel(next)
-        setAnimating(false)
-        setTimeout(() => animateToNext(next), 800)
+        setAnimating(false);
       }
     }
-    requestAnimationFrame(step)
+    requestAnimationFrame(step);
   }
 
-  useEffect(() => {
-    const delay = setTimeout(() => animateToNext(1), 1000)
-    return () => clearTimeout(delay)
-  }, [])
-
-  const W = window.innerWidth
-  const H = window.innerHeight
+  const W = window.innerWidth; const H = window.innerHeight;
 
   return (
     <div style={{
-      width: "100vw", height: "100vh",
-      backgroundImage: `url(${bg})`,
-      backgroundSize: "cover", backgroundPosition: "center",
-      position: "relative", overflow: "hidden",
-      fontFamily: "Nunito, sans-serif"
+      width: "100vw", height: "100vh", backgroundImage: `url(${bg})`,
+      backgroundSize: "cover", backgroundPosition: "center", position: "relative", overflow: "hidden", fontFamily: "Nunito, sans-serif"
     }}>
-
-      {/* Dark overlay */}
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
 
-      {/* Countdown */}
       <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", textAlign: "center", zIndex: 10 }}>
-        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>Next battle in...</div>
-        <div style={{ color: "#fff", fontSize: 52, fontWeight: 900, lineHeight: 1 }}>{countdown}</div>
+        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
+            {animating ? "Traveling..." : (roomData?.current_stage === 1 ? "Prepare for Battle!" : `Stage ${roomData?.current_stage - 1} Clear!`)}
+        </div>
+        <div style={{ color: "#fff", fontSize: 52, fontWeight: 900, lineHeight: 1 }}>
+            {animating ? "..." : countdown}
+        </div>
       </div>
 
       <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 5, pointerEvents: "none" }}>
         {NODES.slice(0, -1).map((node, i) => {
-          const next = NODES[i + 1]
-          const done = i + 1 < currentLevel
-          const pts  = getLinePoints(node.x, node.y, next.x, next.y, NODE_R, W, H)
+          const next = NODES[i + 1];
+          const done = i + 1 < (roomData?.current_stage || 1);
+          const pts = getLinePoints(node.x, node.y, next.x, next.y, W, H);
           return (
-            <line key={i}
-              x1={pts.x1} y1={pts.y1}
-              x2={pts.x2} y2={pts.y2}
-              stroke={done ? "#00e676" : "rgba(255,255,255,0.85)"}
-              strokeWidth="4"           
-              strokeLinecap="round"     
-           
-            />
+            <line key={i} x1={pts.x1} y1={pts.y1} x2={pts.x2} y2={pts.y2}
+              stroke={done ? "#00e676" : "rgba(255,255,255,0.3)"} strokeWidth="4" strokeLinecap="round" />
           )
         })}
       </svg>
 
-      {/* Level nodes */}
       {NODES.map((node, i) => {
-        const done   = i + 1 < currentLevel || (allDone && i + 1 === 5)
-        const active = i + 1 === currentLevel && !allDone
+        const stageNum = i + 1;
+        const isDone = stageNum < (roomData?.current_stage || 1);
+        const isActive = stageNum === (roomData?.current_stage || 1);
         return (
           <div key={node.id} style={{
-            position: "absolute",
-            left: `${node.x}%`, top: `${node.y}%`,
-            transform: "translate(-50%, -50%)",
-            width: NODE_SIZE, height: NODE_SIZE,
-            borderRadius: "50%",
-            overflow: "hidden",
-            border: `4px solid ${done ? "#00e676" : active ? "#fff" : "rgba(255,255,255,0.7)"}`,
-            boxShadow: done
-              ? "0 0 0 5px rgba(0,230,118,0.35)"
-              : active ? "0 0 0 6px rgba(255,255,255,0.25)"
-              : "none",
-            zIndex: 10,
+            position: "absolute", left: `${node.x}%`, top: `${node.y}%`, transform: "translate(-50%, -50%)",
+            width: NODE_SIZE, height: NODE_SIZE, borderRadius: "50%", overflow: "hidden",
+            border: `4px solid ${isDone ? "#00e676" : isActive ? "#fff" : "rgba(255,255,255,0.3)"}`,
+            boxShadow: isActive ? "0 0 20px rgba(255,255,255,0.5)" : "none", zIndex: 10,
           }}>
-            <img src={LEVEL_IMAGES[i]} alt={`lv${i + 1}`}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-
-            <span style={{
-              position: "absolute",
-              top: "50%", left: "50%",
-              transform: "translate(-50%, -50%)",   // ← tengah persis
-              background: "rgba(0,0,0,0.55)",
-              color: "#fff",
-              fontSize: 22,                          // ← lebih besar
-              fontWeight: 900,
-              width: 36, height: 36,
-              borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {i + 1}
-            </span>
+            <img src={LEVEL_IMAGES[i]} alt={`lv${stageNum}`} style={{ width: "100%", height: "100%", objectFit: "cover", filter: isDone ? "none" : isActive ? "none" : "grayscale(1) opacity(0.5)" }} />
+            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 24, fontWeight: 900, width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {stageNum}
+            </div>
           </div>
         )
       })}
 
-      <div style={{
-        position: "absolute",
-        left: `${playerXY.x}%`, top: `${playerXY.y}%`,
-        transform: "translate(-50%, -200%)",
-        display: "flex", gap: 6,
-        zIndex: 20, pointerEvents: "none"
-      }}>
-        {PLAYER_IMAGES.map((img, i) => (
-          <div key={i} style={{
-            width: 44, height: 44,
-            borderRadius: "50%",
-            overflow: "hidden",
-            border: "2px solid #fff",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
-            background: "#222",
-          }}>
-            <img src={img} alt={`player${i + 1}`} style={{
-              width: "100%",
-              height: "160%",         
-              objectFit: "cover",
-              objectPosition: "top",   
-              display: "block",
-            }} />
+      <div style={{ position: "absolute", left: `${playerXY.x}%`, top: `${playerXY.y}%`, transform: "translate(-50%, -180%)", display: "flex", gap: 6, zIndex: 20, pointerEvents: "none" }}>
+        {PLAYER_IMAGES.slice(0, Object.keys(roomData?.players || {}).length).map((img, i) => (
+          <div key={i} style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", border: "3px solid #fff", boxShadow: "0 4px 10px rgba(0,0,0,0.5)", background: "#222" }}>
+            <img src={img} alt="player" style={{ width: "100%", height: "160%", objectFit: "cover", objectPosition: "top" }} />
           </div>
         ))}
       </div>
-
-      {allDone && (
-        <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 30, color: "#00e676", fontWeight: 900, fontSize: 18 }}>
-          All levels complete!
-        </div>
-      )}
-
     </div>
   )
 }
