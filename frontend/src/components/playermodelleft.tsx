@@ -6,16 +6,16 @@ type PlayerCharacterProps = {
 
 export default function PlayerCharacter({ name, sprite, isAttacking }: PlayerCharacterProps) {
   return (
-    <div className={`flex flex-col items-center transition-transform duration-200 ${isAttacking ? "translate-x-16 scale-110" : "translate-x-0"}`}>
+    <div className={`flex flex-col items-center transition-transform duration-200 ${isAttacking ? "translate-x-[clamp(2rem,4vw,5rem)] scale-110" : "translate-x-0"}`}>
 
-      <p className="text-white font-semibold text-lg drop-shadow mb-2">
+      <p className="text-white font-semibold text-[clamp(0.75rem,1vw,1.125rem)] drop-shadow mb-[clamp(0.25rem,0.75vh,0.5rem)]">
         {name}
       </p>
 
       <img
         src={sprite}
         alt={name}
-        className={`w-32 select-none pointer-events-none ${isAttacking ? "brightness-125" : ""}`}
+        className={`w-[clamp(48px,14vw,200px)] md:w-[clamp(80px,10.4vw,200px)] select-none pointer-events-none ${isAttacking ? "brightness-125" : ""}`}
       />
 
     </div>

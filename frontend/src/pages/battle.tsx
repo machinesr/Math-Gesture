@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom" 
 import HandCamera from "../components/handcamera"
 import { GameController } from "../game/gameController"
-import GameUI from "../components/GameUI"
+import GameUI from "../components/gameUI"
 import PlayerCharacterLeft from "../components/playermodelleft"
 import PlayerCharacterRight from "../components/playermodelright"
 import Enemy from "../components/enemy" 
@@ -11,7 +11,7 @@ import red from "../assets/red.png"
 import blue from "../assets/blue.png"
 import green from "../assets/green.png"
 import pink from "../assets/pink.png"
-import AttackEffect from "../components/AttackEffect"
+import AttackEffect from "../components/attackEffect"
 import DamageLog from "../components/damageLog"
 
 
@@ -143,7 +143,7 @@ export default function Battle() {
     if (isWaitingForBoss || (roomData?.shared_monster_hp ?? 0) <= 0) return
     const newState = gameRef.current.update(num)
     if (newState?.event === "attack") {
-      socket.emit("damage_monster", { pin: roomData.pin.toString(), damage: Math.floor(Math.random() * 10) + 1})
+      socket.emit("damage_monster", { pin: roomData.pin.toString(), damage: newState.attackDamage })
     }
     setState(newState)
   }, [roomData, isWaitingForBoss])
@@ -158,7 +158,7 @@ export default function Battle() {
       <DamageLog entries={damageLog} />
       
       {isWaitingForBoss ? (
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 text-white text-2xl font-bold bg-black/50 p-4 rounded-xl backdrop-blur-md z-50 animate-pulse">
+        <div className="absolute top-[clamp(2rem,4vh,4rem)] left-1/2 -translate-x-1/2 text-white text-[clamp(1rem,1.5vw,1.75rem)] font-bold bg-black/50 p-[clamp(0.75rem,1.5vw,1.5rem)] rounded-xl backdrop-blur-md z-50 animate-pulse">
           Summoning Boss...
         </div>
       ) : roomData?.status === "finished" ? (
@@ -166,19 +166,19 @@ export default function Battle() {
       ) : state ? (
         <GameUI state={state} />
       ) : (
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 text-white text-2xl font-bold bg-black/50 p-4 rounded-xl backdrop-blur-md z-50">
+        <div className="absolute top-[clamp(2rem,4vh,4rem)] left-1/2 -translate-x-1/2 text-white text-[clamp(1rem,1.5vw,1.75rem)] font-bold bg-black/50 p-[clamp(0.75rem,1.5vw,1.5rem)] rounded-xl backdrop-blur-md z-50">
           Syncing Battle Data...
         </div>
       )}
       
-      <div className="absolute top-4 right-4 w-80 bg-black/60 p-2 rounded-2xl border border-white/10 z-50 overflow-hidden">
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 md:bottom-auto md:top-[clamp(0.75rem,2vh,2rem)] md:left-auto md:translate-x-0 md:right-[clamp(0.75rem,2vw,2rem)] w-[clamp(192px,60vw,420px)] md:w-[clamp(192px,21vw,420px)] bg-black/60 p-2 rounded-2xl border border-white/10 z-50 overflow-hidden">
         <HandCamera onNumberDetected={handleNumber} />
       </div>
 
       {/* UPDATED: trigger now responds to anyone attacking */}
       <AttackEffect trigger={isAnyAttackActive} />
 
-      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-10 pointer-events-none">
+      <div className="absolute top-[52%] md:top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 pointer-events-none">
           {!isWaitingForBoss && (
             <>
               <BossHealthBar 
@@ -193,14 +193,14 @@ export default function Battle() {
       </div>
 
       <div className="absolute top-[55%] left-0 w-full -translate-y-1/2 h-[45vh] pointer-events-none">
-        <div className="absolute left-[12%] h-full flex flex-col-reverse items-center justify-center gap-12">
+        <div className="absolute left-[6%] md:left-[12%] h-full flex flex-col-reverse items-center justify-center gap-[clamp(1.5rem,4vh,5rem)]">
           {[0, 2].map((i) => {
             const p: any = players[i]
             if (!p) return null
             return <PlayerCharacterLeft key={p.session_id} name={p.nickname} sprite={i === 0 ? red : pink} isAttacking={activeAttackerId === p.session_id} />
           })}
         </div>
-        <div className="absolute right-[12%] h-full flex flex-col-reverse items-center justify-center gap-12">
+        <div className="absolute right-[6%] md:right-[12%] h-full flex flex-col-reverse items-center justify-center gap-[clamp(1.5rem,4vh,5rem)]">
           {[1, 3].map((i) => {
             const p: any = players[i]
             if (!p) return null

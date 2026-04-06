@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState } from "react"
 import { Hands } from "@mediapipe/hands"
-import { Camera } from "@mediapipe/camera_utils"
 import { countFingers } from "../vision/fingerCounter"
 import { FingerStabilizer } from "../vision/fingerStabilizer"
 
@@ -13,13 +12,16 @@ const stabilizers = [
   new FingerStabilizer(5)
 ]
 
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
 export default function HandCamera({ onNumberDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
-  
 
   const handsRef = useRef<any>(null)
-  const cameraRef = useRef<any>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const animFrameRef = useRef<number>(0)
+  const lastFrameTime = useRef(0)
   const callbackRef = useRef(onNumberDetected)
 
   useEffect(() => {
@@ -32,25 +34,22 @@ export default function HandCamera({ onNumberDetected }: Props) {
     let isMounted = true
 
     const startHandTracker = async () => {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      if (!isMounted || !videoRef.current) return;
+      await new Promise(resolve => setTimeout(resolve, 300))
+      if (!isMounted || !videoRef.current) return
 
-  
       const hands = new Hands({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
       })
 
       hands.setOptions({
         maxNumHands: 2,
-        modelComplexity: 1,
+        modelComplexity: isMobile ? 0 : 1,
         minDetectionConfidence: 0.6,
         minTrackingConfidence: 0.6
       })
 
       hands.onResults((results: any) => {
         if (!isMounted) return
-        
-       
         if (!isLoaded && results.multiHandLandmarks) setIsLoaded(true)
 
         if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
@@ -73,31 +72,55 @@ export default function HandCamera({ onNumberDetected }: Props) {
         if (detectedHands > 0) callbackRef.current(total)
       })
 
-
       try {
         await hands.initialize()
         handsRef.current = hands
       } catch (err) {
         console.error("AI Initialization failed:", err)
+        return
       }
 
-  
-      const camera = new Camera(videoRef.current, {
-        onFrame: async () => {
-          if (videoRef.current && videoRef.current.readyState >= 2 && handsRef.current) {
-            try {
-              await handsRef.current.send({ image: videoRef.current })
-            } catch (e) {
-           
-            }
+      // Use getUserMedia directly so we can set facingMode for mobile
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: isMobile ? 320 : 640 },
+            height: { ideal: isMobile ? 240 : 360 },
           }
-        },
-        width: 640,
-        height: 360
-      })
+        })
+        if (!isMounted) {
+          stream.getTracks().forEach(t => t.stop())
+          return
+        }
+        streamRef.current = stream
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      } catch (err) {
+        console.error("Camera access failed:", err)
+        return
+      }
 
-      camera.start()
-      cameraRef.current = camera
+      // Throttle to 15fps on mobile, 30fps on desktop
+      const frameInterval = 1000 / (isMobile ? 15 : 30)
+
+      const processFrame = async (timestamp: number) => {
+        if (!isMounted) return
+        animFrameRef.current = requestAnimationFrame(processFrame)
+
+        if (timestamp - lastFrameTime.current < frameInterval) return
+        lastFrameTime.current = timestamp
+
+        if (videoRef.current && videoRef.current.readyState >= 2 && handsRef.current) {
+          try {
+            await handsRef.current.send({ image: videoRef.current })
+          } catch (_) {
+            // ignore frame errors
+          }
+        }
+      }
+
+      animFrameRef.current = requestAnimationFrame(processFrame)
     }
 
     startHandTracker()
@@ -105,16 +128,19 @@ export default function HandCamera({ onNumberDetected }: Props) {
     return () => {
       console.log("Stage Transition: Killing Hand Tracker...")
       isMounted = false
-      
 
-      if (cameraRef.current) {
-        cameraRef.current.stop()
+      cancelAnimationFrame(animFrameRef.current)
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
       }
       if (handsRef.current) {
         handsRef.current.close()
+        handsRef.current = null
       }
     }
-  }, []) 
+  }, [])
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-black aspect-video w-full shadow-2xl border border-white/10">
@@ -126,6 +152,7 @@ export default function HandCamera({ onNumberDetected }: Props) {
       <video
         ref={videoRef}
         autoPlay
+        muted
         playsInline
         className="w-full h-full object-cover"
         style={{ transform: "scaleX(-1)" }}

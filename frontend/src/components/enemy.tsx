@@ -36,7 +36,7 @@ export default function Enemy({ isHit, stage }: EnemyProps) {
     >
       <img
         src={sprite}
-        className="w-72 select-none pointer-events-none object-contain"
+        className="w-[clamp(144px,20vw,384px)] select-none pointer-events-none object-contain"
         alt="Enemy"
       />
     </div>

@@ -62,14 +62,14 @@ export default function Map() {
     >
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
-      <div className="relative z-10 flex flex-col items-center w-fit px-12">
-        
-        <h1 className="text-white text-6xl font-bold mb-5 tracking-tight text-center whitespace-nowrap">
+      <div className="relative z-10 flex flex-col items-center w-fit px-[clamp(1.5rem,3vw,4rem)]">
+
+        <h1 className="text-white text-[clamp(1.5rem,4vw,5rem)] font-bold mb-[clamp(0.75rem,2vh,1.5rem)] tracking-tight text-center">
           {loading ? "connecting..." : (step === "code" ? "Join a room" : "enter your username...")}
         </h1>
 
-        <div className="bg-white w-full rounded-[40px] p-12 shadow-2xl flex flex-col gap-4">
-          
+        <div className="bg-white w-full rounded-[40px] p-[clamp(1.5rem,3vw,4rem)] shadow-2xl flex flex-col gap-[clamp(0.75rem,1.5vh,1.25rem)]">
+
           <input
             type="text"
             autoFocus
@@ -78,15 +78,15 @@ export default function Map() {
             value={step === "code" ? roomCode : username}
             onChange={(e) => step === "code" ? setRoomCode(e.target.value) : setUsername(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleNextStep()}
-     
-            className="w-full border-2 border-gray-100 rounded-2xl py-5 px-8 text-center text-gray-400 !text-3xl font-semibold placeholder-gray-200 outline-none focus:border-gray-200 transition-colors disabled:opacity-50"
+
+            className="w-full border-2 border-gray-100 rounded-2xl py-[clamp(0.75rem,2vh,1.5rem)] px-[clamp(1.25rem,2vw,2.5rem)] text-center text-gray-400 !text-[clamp(1rem,1.75vw,2.25rem)] font-semibold placeholder-gray-200 outline-none focus:border-gray-200 transition-colors disabled:opacity-50"
           />
 
           <button
             onClick={handleNextStep}
             disabled={loading}
-         
-            className="w-full bg-[#111] text-white rounded-2xl py-6 !text-3xl font-bold hover:bg-black active:scale-[0.98] transition-all disabled:bg-gray-400 h-20"
+
+            className="w-full bg-[#111] text-white rounded-2xl !text-[clamp(1rem,1.75vw,2.25rem)] font-bold hover:bg-black active:scale-[0.98] transition-all disabled:bg-gray-400 h-[clamp(3.5rem,5vw,5.5rem)]"
           >
             {loading ? "loading..." : "enter"}
           </button>

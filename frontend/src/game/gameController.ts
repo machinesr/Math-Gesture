@@ -2,11 +2,26 @@ import { generateQuestion } from "./questionGenerator"
 import { HoldDetector } from "./holdDetector"
 import type { Question } from "./questionGenerator"
 
+export type GameState = {
+  holdProgress: number
+  currentNumber: number | null
+  locked: boolean
+  result: "correct" | "wrong" | null
+  question: Question
+  event: "attack" | null
+  bossHp: number
+  maxBossHp: number
+  combo: number
+  attackDamage: number
+}
+
 export class GameController {
 
   private bossHp = 200
   private maxBossHp = 250
-  private damagePerHit = 10
+
+  private combo = 0
+  private attackDamage = 0
 
   private holdDetector = new HoldDetector(1000)
 
@@ -44,21 +59,18 @@ export class GameController {
       if (hold.number === this.question.answer) {
         this.result = "correct"
         event = "attack"
+        this.attackDamage = 5 + this.combo * 2
+        this.combo++
 
         // remove this later waktu connect backend
-        this.bossHp -= this.damagePerHit
+        this.bossHp -= this.attackDamage
         if (this.bossHp < 0) this.bossHp = 0
         //
 
-        // nanti something like this
-        
-        // socket.emit("damage_monster", {
-        // pin,
-        // damage: 1
-        // })
-
       } else {
         this.result = "wrong"
+        this.combo = 0
+        this.attackDamage = 0
       }
 
       this.feedbackEnd = now + 700
@@ -80,8 +92,10 @@ export class GameController {
       result: this.result,
       question: this.question,
       event,
-      bossHp:this.bossHp,
-      maxBossHp: this.maxBossHp
+      bossHp: this.bossHp,
+      maxBossHp: this.maxBossHp,
+      combo: this.combo,
+      attackDamage: this.attackDamage,
     }
   }
 }

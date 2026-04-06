@@ -52,7 +52,7 @@ export default function AttackEffect({ trigger }: { trigger: boolean }) {
       <img
         key={frame}
         src={frames[frame]}
-        className="w-[600px] translate-y-20"
+        className="w-[clamp(300px,52vw,1000px)] translate-y-[clamp(3rem,5vh,7rem)]"
       />
     </div>
   )

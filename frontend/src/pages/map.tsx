@@ -25,8 +25,8 @@ const NODES = [
   { id: 5, x: 85, y: 63 },
 ]
 
-const NODE_SIZE = 120  
-const NODE_R    = NODE_SIZE / 2  
+const NODE_SIZE = Math.min(180, Math.max(72, Math.round(window.innerWidth * 0.094)))
+const NODE_R    = NODE_SIZE / 2
 
 function getLinePoints(ax: number, ay: number, bx: number, by: number, totalW: number, totalH: number) {
   const apx = ax / 100 * totalW; const apy = ay / 100 * totalH;
@@ -162,10 +162,10 @@ export default function Map() {
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
 
       <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", textAlign: "center", zIndex: 10 }}>
-        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
+        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "clamp(0.75rem,1vw,1rem)" }}>
             {animating ? "Traveling..." : (roomData?.current_stage === 1 ? "Prepare for Battle!" : `Stage ${roomData?.current_stage - 1} Clear!`)}
         </div>
-        <div style={{ color: "#fff", fontSize: 52, fontWeight: 900, lineHeight: 1 }}>
+        <div style={{ color: "#fff", fontSize: "clamp(2rem,4.2vw,5rem)", fontWeight: 900, lineHeight: 1 }}>
             {animating ? "..." : countdown}
         </div>
       </div>
@@ -194,16 +194,16 @@ export default function Map() {
             boxShadow: isActive ? "0 0 20px rgba(255,255,255,0.5)" : "none", zIndex: 10,
           }}>
             <img src={LEVEL_IMAGES[i]} alt={`lv${stageNum}`} style={{ width: "100%", height: "100%", objectFit: "cover", filter: isDone ? "none" : isActive ? "none" : "grayscale(1) opacity(0.5)" }} />
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 24, fontWeight: 900, width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "clamp(0.875rem,1.5vw,1.5rem)", fontWeight: 900, width: "33%", height: "33%", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {stageNum}
             </div>
           </div>
         )
       })}
 
-      <div style={{ position: "absolute", left: `${playerXY.x}%`, top: `${playerXY.y}%`, transform: "translate(-50%, -180%)", display: "flex", gap: 6, zIndex: 20, pointerEvents: "none" }}>
+      <div style={{ position: "absolute", left: `${playerXY.x}%`, top: `${playerXY.y}%`, transform: "translate(-50%, -180%)", display: "flex", gap: "clamp(4px,0.4vw,8px)", zIndex: 20, pointerEvents: "none" }}>
         {PLAYER_IMAGES.slice(0, Object.keys(roomData?.players || {}).length).map((img, i) => (
-          <div key={i} style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", border: "3px solid #fff", boxShadow: "0 4px 10px rgba(0,0,0,0.5)", background: "#222" }}>
+          <div key={i} style={{ width: "clamp(32px,3vw,56px)", height: "clamp(32px,3vw,56px)", borderRadius: "50%", overflow: "hidden", border: "3px solid #fff", boxShadow: "0 4px 10px rgba(0,0,0,0.5)", background: "#222" }}>
             <img src={img} alt="player" style={{ width: "100%", height: "160%", objectFit: "cover", objectPosition: "top" }} />
           </div>
         ))}
