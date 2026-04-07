@@ -36,7 +36,7 @@ async def disconnect(sid, environ):
 @sio.event
 async def create_room(sid, data):
     nickname = data.get("nickname", "Host")
-    time_limit = data.get("time_limit_seconds", 1200)
+    time_limit = data.get("time_limit_seconds", 360)
     
     pin = generate_pin() 
     while pin in active_rooms:
@@ -212,6 +212,8 @@ async def damage_monster(sid, data):
         if sid in room.players:
             room.players[sid].score += damage_dealt
             room.players[sid].combo = combo
+            if combo > room.players[sid].highest_combo:
+                room.players[sid].highest_combo = combo
 
 
         await sio.emit("monster_damaged", {

@@ -8,6 +8,7 @@ class Player(BaseModel):
     combo_multiplier: int=1
     is_ready: bool = False
     combo: int = 0
+    highest_combo: int = 0
     
 class Room(BaseModel):
     pin: str

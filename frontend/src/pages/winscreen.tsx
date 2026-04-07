@@ -21,7 +21,7 @@ export default function Results() {
   ].filter(Boolean) 
 
   const PODIUM_H: Record<number, string> = { 1: "54vh", 2: "44vh", 3: "36vh" }
-  const SPRITE_H: Record<number, string> = { 1: "clamp(60px, 12vh, 140px)", 2: "clamp(44px, 9vh, 100px)", 3: "clamp(40px, 7.5vh, 88px)" }
+  const SPRITE_SIZE = "clamp(80px, 14vh, 180px)"
 
   useEffect(() => {
     const colors = ["#ffd700", "#ff5e7e", "#26ccff", "#88ff5a", "#a25afd"]
@@ -58,7 +58,13 @@ export default function Results() {
 
           return (
             <div key={player.session_id} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, maxWidth: 250 }}>
-              <img src={spriteImg} style={{ height: SPRITE_H[player.rank], marginBottom: -10, zIndex: 2, imageRendering: "pixelated" }} />
+              {player.highest_combo > 0 && (
+                <div style={{ textAlign: "center", marginBottom: 4, zIndex: 2 }}>
+                  <div style={{ color: player.highest_combo >= 8 ? "#f87171" : player.highest_combo >= 4 ? "#fb923c" : "#fde047", fontWeight: 900, fontSize: "clamp(14px, 2.2vw, 32px)", lineHeight: 1 }}>x{player.highest_combo}</div>
+                  <div style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700, fontSize: "clamp(9px, 1vw, 14px)", letterSpacing: "0.1em", textTransform: "uppercase" }}>best combo</div>
+                </div>
+              )}
+              <img src={spriteImg} style={{ height: SPRITE_SIZE, marginBottom: -10, zIndex: 2, imageRendering: "pixelated" }} />
               
               <div style={{
                 background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", height: PODIUM_H[player.rank],
