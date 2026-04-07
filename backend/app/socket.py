@@ -36,7 +36,7 @@ async def disconnect(sid, environ):
 @sio.event
 async def create_room(sid, data):
     nickname = data.get("nickname", "Host")
-    time_limit = data.get("time_limit_seconds", 600)
+    time_limit = data.get("time_limit_seconds", 1200)
     
     pin = generate_pin() 
     while pin in active_rooms:
