@@ -1,20 +1,5 @@
 import type { GameState } from "../game/gameController"
 
-function ComboDisplay({ combo }: { combo: number }) {
-  if (combo === 0) return null
-
-  const colorClass =
-    combo >= 8 ? "text-red-400 drop-shadow-[0_0_20px_rgba(248,113,113,0.9)]" :
-    combo >= 4 ? "text-orange-400 drop-shadow-[0_0_20px_rgba(251,146,60,0.9)]" :
-                 "text-yellow-300 drop-shadow-[0_0_16px_rgba(253,224,71,0.7)]"
-
-  return (
-    <div className={`absolute bottom-[clamp(2rem,5vh,5rem)] right-[clamp(2rem,4vw,5rem)] flex flex-col items-end font-extrabold leading-none ${colorClass}`}>
-      <span className="text-[clamp(2rem,5vw,6rem)] tracking-tight">x{combo}</span>
-      <span className="text-[clamp(1rem,2vw,2.5rem)] tracking-widest uppercase opacity-80">combo</span>
-    </div>
-  )
-}
 
 function QuestionDisplay({ question }: { question: {a:number,b:number} }) {
   return (
@@ -71,7 +56,6 @@ export default function GameUI({ state }: { state: GameState }) {
 
       </div>
 
-      <ComboDisplay combo={state.combo} />
 
     </div>
   )

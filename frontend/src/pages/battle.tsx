@@ -42,6 +42,7 @@ export default function Battle() {
   const [state, setState] = useState<any>(null)
   const [damageLog, setDamageLog] = useState<any[]>([])
   const [activeAttackerId, setActiveAttackerId] = useState<string | null>(null)
+  const [playerCombos, setPlayerCombos] = useState<Record<string, number>>({})
   
   const hasAdvancedRef = useRef(false)
   const bossWasAlive = useRef(false)
@@ -73,8 +74,8 @@ export default function Battle() {
     const onMonsterDamaged = (data: any) => {
       setRoomData((prev: any) => (prev ? { ...prev, shared_monster_hp: data.shared_monster_hp } : prev))
       setActiveAttackerId(data.player_id)
-      
-  
+      setPlayerCombos(prev => ({ ...prev, [data.player_id]: data.combo ?? 0 }))
+
       setTimeout(() => setActiveAttackerId(null), 800)
 
       const players = roomDataRef.current?.players || {}
@@ -143,7 +144,7 @@ export default function Battle() {
     if (isWaitingForBoss || (roomData?.shared_monster_hp ?? 0) <= 0) return
     const newState = gameRef.current.update(num)
     if (newState?.event === "attack") {
-      socket.emit("damage_monster", { pin: roomData.pin.toString(), damage: newState.attackDamage })
+      socket.emit("damage_monster", { pin: roomData.pin.toString(), damage: newState.attackDamage, combo: newState.combo })
     }
     setState(newState)
   }, [roomData, isWaitingForBoss])
@@ -197,14 +198,18 @@ export default function Battle() {
           {[0, 2].map((i) => {
             const p: any = players[i]
             if (!p) return null
-            return <PlayerCharacterLeft key={p.session_id} name={p.nickname} sprite={i === 0 ? red : pink} isAttacking={activeAttackerId === p.session_id} />
+            const isCurrentPlayer = p.session_id === socket.id
+            const combo = isCurrentPlayer ? (state?.combo ?? 0) : (playerCombos[p.session_id] ?? 0)
+            return <PlayerCharacterLeft key={p.session_id} name={p.nickname} sprite={i === 0 ? red : pink} isAttacking={activeAttackerId === p.session_id} combo={combo} isCurrentPlayer={isCurrentPlayer} />
           })}
         </div>
         <div className="absolute right-[6%] md:right-[12%] h-full flex flex-col-reverse items-center justify-center gap-[clamp(1.5rem,4vh,5rem)]">
           {[1, 3].map((i) => {
             const p: any = players[i]
             if (!p) return null
-            return <PlayerCharacterRight key={p.session_id} name={p.nickname} sprite={i === 1 ? blue : green} isAttacking={activeAttackerId === p.session_id} />
+            const isCurrentPlayer = p.session_id === socket.id
+            const combo = isCurrentPlayer ? (state?.combo ?? 0) : (playerCombos[p.session_id] ?? 0)
+            return <PlayerCharacterRight key={p.session_id} name={p.nickname} sprite={i === 1 ? blue : green} isAttacking={activeAttackerId === p.session_id} combo={combo} isCurrentPlayer={isCurrentPlayer} />
           })}
         </div>
       </div>

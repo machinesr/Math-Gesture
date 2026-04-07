@@ -195,27 +195,30 @@ async def advance_level(sid, data):
 @sio.event
 async def damage_monster(sid, data):
     pin = data.get("pin", "").upper()
-  
-    damage_dealt = data.get("damage", 10) 
-    
+
+    damage_dealt = data.get("damage", 10)
+    combo = data.get("combo", 0)
+
     if pin not in active_rooms:
         return
-    
+
     room = active_rooms[pin]
-    
-   
+
+
     if room.status == "playing" and room.shared_monster_hp > 0:
         room.shared_monster_hp = max(0, room.shared_monster_hp - damage_dealt)
-        
-       
+
+
         if sid in room.players:
             room.players[sid].score += damage_dealt
+            room.players[sid].combo = combo
 
-    
+
         await sio.emit("monster_damaged", {
             "shared_monster_hp": room.shared_monster_hp,
             "player_id": sid,
-            "damage": damage_dealt  
+            "damage": damage_dealt,
+            "combo": combo
         }, room=pin)
 
 
