@@ -9,6 +9,7 @@ class Player(BaseModel):
     is_ready: bool = False
     combo: int = 0
     highest_combo: int = 0
+    is_spectator: bool = False
     
 class Room(BaseModel):
     pin: str
@@ -23,3 +24,4 @@ class Room(BaseModel):
     shared_monster_hp: int=0
     shared_monster_max_hp: int=0
     start_time: float = 0.0
+    difficulty: str = "baby"

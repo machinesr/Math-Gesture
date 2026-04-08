@@ -8,8 +8,13 @@ from app.state import active_rooms
 
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 
+MAX_ACTIVE_PLAYERS = 4
+
 def generate_pin(length=4):
     return ''.join(random.choices(string.digits, k=length))
+
+def active_players(room):
+    return [p for p in room.players.values() if not p.is_spectator]
 
 @sio.event
 async def connect(sid, environ):
@@ -63,28 +68,59 @@ async def create_room(sid, data):
     print(f"Room {pin} created by {nickname} ({sid})")
 
 @sio.event
+async def lookup_room(sid, data):
+    pin = str(data.get("pin", ""))
+    if pin not in active_rooms:
+        await sio.emit("room_not_found", {"pin": pin}, to=sid)
+        return
+    room = active_rooms[pin]
+    actives = active_players(room)
+    can_play = room.status == "lobby" and len(actives) < MAX_ACTIVE_PLAYERS
+    can_spectate = (not can_play)
+    await sio.emit("room_found", {
+        "pin": pin,
+        "status": room.status,
+        "player_count": len(actives),
+        "capacity": MAX_ACTIVE_PLAYERS,
+        "can_play": can_play,
+        "can_spectate": can_spectate,
+    }, to=sid)
+
+@sio.event
 async def join_room(sid, data):
     pin = str(data.get("pin", "1234"))
-    
+
     if pin not in active_rooms:
         await sio.emit("error", {"message": "Room not found!"}, to=sid)
         return
 
     room = active_rooms[pin]
 
-   
+
     if sid not in room.players:
- 
+
         nickname = data.get("nickname", "Player")
-        room.players[sid] = Player(nickname=nickname, session_id=sid)
-        print(f"New User {nickname} joined room {pin}.")
+        # Decide spectator vs active based on current room state.
+        actives = active_players(room)
+        force_spectate = bool(data.get("spectate", False))
+        is_spectator = (
+            force_spectate
+            or room.status != "lobby"
+            or len(actives) >= MAX_ACTIVE_PLAYERS
+        )
+        room.players[sid] = Player(
+            nickname=nickname,
+            session_id=sid,
+            is_spectator=is_spectator,
+        )
+        print(f"New User {nickname} joined room {pin} (spectator={is_spectator}).")
     else:
-       
+
         print(f"User {room.players[sid].nickname} re-synced with room {pin}.")
-    
-   
+
+
     await sio.enter_room(sid, pin)
-    
+
 
     await sio.emit("lobby_updated", room.model_dump(), room=pin)
     
@@ -115,9 +151,9 @@ async def start_game(sid, data):
         return
     room.status = "playing"
     room.start_time = time.time()
-    
-    player_count = len(room.players)
-    
+
+    player_count = max(1, len(active_players(room)))
+
     room.shared_monster_max_hp = 50 * player_count
     room.shared_monster_hp = room.shared_monster_max_hp
     room.current_stage = 1
@@ -146,7 +182,7 @@ async def end_game(pin: str, reason: str):
 
    
     leaderboard = sorted(
-        [player.model_dump() for player in room.players.values()],
+        [player.model_dump() for player in room.players.values() if not player.is_spectator],
         key=lambda x: x["score"],
         reverse=True
     )
@@ -180,8 +216,8 @@ async def advance_level(sid, data):
     
    
     room.current_stage += 1
-    player_count = len(room.players)
-    
+    player_count = max(1, len(active_players(room)))
+
 
     room.shared_monster_max_hp = 50 * player_count * room.current_stage
     room.shared_monster_hp = room.shared_monster_max_hp
@@ -204,6 +240,10 @@ async def damage_monster(sid, data):
 
     room = active_rooms[pin]
 
+
+    # Spectators can't damage the monster.
+    if sid in room.players and room.players[sid].is_spectator:
+        return
 
     if room.status == "playing" and room.shared_monster_hp > 0:
         room.shared_monster_hp = max(0, room.shared_monster_hp - damage_dealt)
@@ -238,23 +278,48 @@ active_rooms["1234"] = Room(
     current_stage=1
 )
 
+VALID_DIFFICULTIES = {"baby", "normal", "master", "god"}
+
+@sio.event
+async def set_difficulty(sid, data):
+    pin = str(data.get("pin", ""))
+    difficulty = str(data.get("difficulty", "baby"))
+    if pin not in active_rooms:
+        return
+    if difficulty not in VALID_DIFFICULTIES:
+        return
+    room = active_rooms[pin]
+    # Only the host can change difficulty.
+    if room.creator_session_id != sid:
+        return
+    # Lock difficulty once the game has started.
+    if room.status != "lobby":
+        return
+    room.difficulty = difficulty
+    await sio.emit("lobby_updated", room.model_dump(), room=pin)
+
 @sio.event
 async def player_ready(sid, data):
     pin = str(data.get("pin"))
     is_ready = data.get("ready", False)
     
+    all_ready = False
     if pin in active_rooms:
         room = active_rooms[pin]
         if sid in room.players:
+            # Spectators can't ready up.
+            if room.players[sid].is_spectator:
+                return
             room.players[sid].is_ready = is_ready
             await sio.emit("lobby_updated", room.model_dump(), room=pin)
-            
-           
-            all_ready = all(p.is_ready for p in room.players.values())
-            
-           
-            if all_ready and len(room.players) > 0:
+
+
+            actives = active_players(room)
+            all_ready = len(actives) > 0 and all(p.is_ready for p in actives)
+
+
+            if all_ready:
                 await sio.emit("all_players_ready", {"pin": pin}, room=pin)
 
-    if all_ready and len(room.players) > 0:
+    if all_ready:
         await start_game(sid, {"pin": pin})
