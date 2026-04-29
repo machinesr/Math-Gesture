@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { socket } from "../../infrastructure/socket/client"
 import { SOCKET_EVENTS } from "../../infrastructure/socket/events"
 import { useRoom } from "../../app/RoomProvider"
+import { useCamera } from "../../app/CameraProvider"
 import { STAGE_COUNTDOWN_SEC, STAGE_TRAVEL_MS } from "../../shared/constants/stages"
 
 export type Node = { id: number; x: number; y: number }
@@ -18,6 +19,7 @@ export const NODES: Node[] = [
 export function useStageMap() {
   const navigate = useNavigate()
   const { roomData, setRoomData } = useRoom()
+  const { init: initCamera, isReady: cameraReady, isInitializing: cameraInitializing, error: cameraError } = useCamera()
 
   const initialStage = roomData?.current_stage || 1
   const startVisualNodeIdx = initialStage > 1 ? initialStage - 2 : 0
@@ -100,6 +102,17 @@ export function useStageMap() {
     return () => clearInterval(interval)
   }, [isTimerActive])
 
+  // Kick off camera init the moment the first stage countdown becomes active.
+  // Spectators still call init — it's a no-op for them in practice (they don't
+  // mount HandCamera) but keeping the call site uniform avoids surprise if a
+  // spectator is later promoted. Subsequent stages don't re-init because the
+  // CameraProvider guards against duplicate inits.
+  useEffect(() => {
+    if (!isTimerActive) return
+    if ((roomData?.current_stage || 1) !== 1) return
+    initCamera()
+  }, [isTimerActive, roomData?.current_stage, initCamera])
+
   // Navigate to battle when countdown hits zero
   useEffect(() => {
     if (countdown === 0 && isTimerActive) {
@@ -125,5 +138,14 @@ export function useStageMap() {
     requestAnimationFrame(step)
   }
 
-  return { roomData, countdown, playerXY, animating, viewport }
+  return {
+    roomData,
+    countdown,
+    playerXY,
+    animating,
+    viewport,
+    cameraReady,
+    cameraInitializing,
+    cameraError,
+  }
 }

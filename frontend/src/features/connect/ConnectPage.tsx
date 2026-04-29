@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom"
 import { socket } from "../../infrastructure/socket/client"
 import { SOCKET_EVENTS } from "../../infrastructure/socket/events"
 import { useRoom } from "../../app/RoomProvider"
-import { useCamera } from "../../app/CameraProvider"
 import { LOBBY_BG } from "../../shared/constants/stages"
 
 type LookupResult = {
@@ -18,7 +17,6 @@ type LookupResult = {
 export default function ConnectPage() {
   const navigate = useNavigate()
   const { setRoomData, notice, setNotice } = useRoom()
-  const { init: initCamera } = useCamera()
   const [step, setStep] = useState<"code" | "username">("code")
   const [isCreating, setIsCreating] = useState(false)
   const [roomCode, setRoomCode] = useState("")
@@ -83,9 +81,6 @@ export default function ConnectPage() {
     } else if (step === "username" && username.trim() !== "") {
       setLoading(true)
       localStorage.setItem("nickname", username)
-      // Warm up the camera in the background. Spectators don't need it but
-      // calling init early is harmless and means promoted players are ready.
-      initCamera()
       if (isCreating) {
         socket.emit(SOCKET_EVENTS.CREATE_ROOM, { nickname: username })
       } else {

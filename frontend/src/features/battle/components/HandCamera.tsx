@@ -9,7 +9,7 @@ type Props = {
 // MediaPipe Hands instance live in CameraProvider so they survive across page
 // navigations and don't need to cold-start when the user enters a new battle.
 export default function HandCamera({ onNumberDetected }: Props) {
-  const { isReady, stream, subscribe, init } = useCamera()
+  const { isReady, stream, error, subscribe, init, attachVideo } = useCamera()
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const callbackRef = useRef(onNumberDetected)
 
@@ -23,7 +23,10 @@ export default function HandCamera({ onNumberDetected }: Props) {
     if (!isReady) init()
   }, [isReady, init])
 
-  // Attach the persistent stream to our local visible <video>
+  // Attach the persistent stream to our local visible <video>, and register
+  // that same element with CameraProvider so MediaPipe reads from an on-screen
+  // video — hidden/offscreen videos are throttled on iOS Safari and starve the
+  // model.
   useEffect(() => {
     const el = videoRef.current
     if (el && stream) {
@@ -31,6 +34,11 @@ export default function HandCamera({ onNumberDetected }: Props) {
       el.play().catch(() => {})
     }
   }, [stream])
+
+  useEffect(() => {
+    attachVideo(videoRef.current)
+    return () => attachVideo(null)
+  }, [attachVideo])
 
   // Subscribe to detection events for as long as we're mounted
   useEffect(() => {
@@ -40,8 +48,14 @@ export default function HandCamera({ onNumberDetected }: Props) {
   return (
     <div className="relative overflow-hidden rounded-xl bg-black aspect-video w-full shadow-2xl border border-white/10">
       {!isReady && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/80 backdrop-blur-md z-10">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/80 backdrop-blur-md z-10 p-4 text-center">
+          {error ? (
+            <p className="text-[clamp(0.75rem,1vw,0.95rem)] font-semibold leading-snug text-red-200">
+              {error}
+            </p>
+          ) : (
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+          )}
         </div>
       )}
       <video

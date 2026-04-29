@@ -10,6 +10,7 @@ import {
   ATTACK_INDICATION_MS,
   DAMAGE_LOG_MAX,
   DAMAGE_LOG_TTL_MS,
+  FEEDBACK_MS,
 } from "../../shared/constants/stages"
 
 type UseBattleResult = {
@@ -154,6 +155,18 @@ export function useBattle(): UseBattleResult {
       if (isHost) socket.emit(SOCKET_EVENTS.ADVANCE_LEVEL, { pin: roomData.pin.toString() })
     }
   }, [roomData, state, navigate])
+
+  // Drive the post-result advance from a wall-clock timer instead of camera
+  // events, so a correct answer rotates to a new question even if the player
+  // pulls their hand out of frame the moment they lock in.
+  useEffect(() => {
+    if (!state?.result) return
+    const t = setTimeout(() => {
+      const next = gameRef.current.tick()
+      if (next) setState(next)
+    }, FEEDBACK_MS + 50)
+    return () => clearTimeout(t)
+  }, [state?.result])
 
   const handleNumber = useCallback(
     (num: number) => {

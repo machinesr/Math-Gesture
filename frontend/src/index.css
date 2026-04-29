@@ -105,6 +105,11 @@ button:focus-visible {
   animation: softPulse 1.6s ease-in-out infinite;
 }
 
+/* Plain spin — used by inline-styled spinners that can't pull in Tailwind classes. */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Lock the whole app to the viewport. No scroll, no horizontal pan, no
    address-bar bounce. Pages must lay themselves out within 100svh × 100vw. */
 html, body, #root {

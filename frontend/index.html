@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- MediaPipe Hands WASM/model assets are pulled from jsdelivr at runtime.
+         Pre-warming the connection (DNS + TLS) shaves a meaningful chunk off
+         the camera cold-start on mobile networks where handshakes dominate. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
     <title>frontend</title>
   </head>
   <body>

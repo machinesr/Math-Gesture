@@ -1,4 +1,5 @@
 import { LOBBY_BG, STAGES, PLAYER_SPRITES, getStage } from "../../shared/constants/stages"
+import { socket } from "../../infrastructure/socket/client"
 import { NODES, useStageMap } from "./useStageMap"
 
 function computeNodeSize(viewportW: number) {
@@ -28,7 +29,16 @@ function getLinePoints(
 }
 
 export default function StageMapPage() {
-  const { roomData, countdown, playerXY, animating, viewport } = useStageMap()
+  const {
+    roomData,
+    countdown,
+    playerXY,
+    animating,
+    viewport,
+    cameraReady,
+    cameraInitializing,
+    cameraError,
+  } = useStageMap()
   const W = viewport.w
   const H = viewport.h
   const NODE_SIZE = computeNodeSize(W)
@@ -36,6 +46,10 @@ export default function StageMapPage() {
 
   const stageNum = roomData?.current_stage ?? 1
   const upcoming = getStage(stageNum)
+  const me = roomData && socket.id ? roomData.players?.[socket.id] : undefined
+  const isSpectator = !!me?.is_spectator
+  // Only players need the camera; spectators can ignore the loading chip.
+  const showCameraStatus = !isSpectator && stageNum === 1 && (cameraInitializing || cameraError || !cameraReady)
 
   return (
     <div
@@ -122,6 +136,49 @@ export default function StageMapPage() {
             {animating ? "..." : countdown}
           </span>
         </div>
+
+        {showCameraStatus && (
+          <div
+            style={{
+              marginTop: "clamp(0.5rem,1vh,0.875rem)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              background: cameraError ? "rgba(127,29,29,0.7)" : "rgba(0,0,0,0.55)",
+              border: `1px solid ${cameraError ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.1)"}`,
+              padding: "clamp(0.35rem,0.6vh,0.55rem) clamp(0.75rem,1.25vw,1.25rem)",
+              borderRadius: "999px",
+              backdropFilter: "blur(6px)",
+              maxWidth: "min(90vw, 420px)",
+            }}
+          >
+            {!cameraError && (
+              <span
+                style={{
+                  width: "0.75rem",
+                  height: "0.75rem",
+                  borderRadius: "50%",
+                  border: "2px solid rgba(255,255,255,0.7)",
+                  borderTopColor: "transparent",
+                  animation: "spin 0.9s linear infinite",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            <span
+              style={{
+                color: cameraError ? "#fecaca" : "rgba(255,255,255,0.85)",
+                fontSize: "clamp(0.7rem,0.95vw,0.95rem)",
+                fontWeight: 600,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                textAlign: "left",
+              }}
+            >
+              {cameraError ? cameraError : "Loading camera..."}
+            </span>
+          </div>
+        )}
       </div>
 
       <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 5, pointerEvents: "none" }}>

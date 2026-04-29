@@ -56,6 +56,34 @@ export class GameController {
     this.lastLocked = false
   }
 
+  // Passive feedback-timer advance. Lets a wall-clock timer (in React) drive
+  // the post-correct question rotation when no hand is in frame, without
+  // disturbing an ongoing hold. Returns null while feedback is still pending.
+  tick(): GameState | null {
+    const now = performance.now()
+    if (!this.result || now <= this.feedbackEnd) return null
+
+    const wasCorrect = this.result === "correct"
+    this.result = null
+    if (wasCorrect) {
+      this.question = generateQuestion(this.lastAnswer, this.difficulty)
+      this.lastAnswer = this.question.answer
+    }
+    this.holdDetector.reset()
+    this.lastLocked = false
+
+    return {
+      holdProgress: 0,
+      currentNumber: null,
+      locked: false,
+      result: null,
+      question: this.question,
+      event: null,
+      combo: this.combo,
+      attackDamage: this.attackDamage,
+    }
+  }
+
   update(number: number | null): GameState {
     const now = performance.now()
     const hold = this.holdDetector.update(number)

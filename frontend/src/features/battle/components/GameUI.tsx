@@ -14,9 +14,9 @@ function IntegralDisplay({
   return (
     <span className="inline-flex items-center gap-[0.6em] font-serif whitespace-nowrap">
       <span className="inline-flex flex-col items-center leading-none">
-        <span className="text-[0.5em] font-bold not-italic mb-[0.15em]">{upper}</span>
+        <span className="text-[0.5em] font-bold not-italic mb-[0.3em]">{upper}</span>
         <span className="text-[2em] leading-[0.8]">∫</span>
-        <span className="text-[0.5em] font-bold not-italic mt-[0.15em]">{lower}</span>
+        <span className="text-[0.5em] font-bold not-italic mt-[0.5em]">{lower}</span>
       </span>
       <span className="italic tracking-wide">{integrand}</span>
       <span className="italic">{differential}</span>

@@ -7,7 +7,6 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { Hands } from "@mediapipe/hands"
 import { countFingers } from "../domain/vision/fingerCounter"
 import { FingerStabilizer } from "../domain/vision/fingerStabilizer"
 
@@ -17,8 +16,10 @@ type CameraContextValue = {
   isReady: boolean
   isInitializing: boolean
   stream: MediaStream | null
+  error: string | null
   init: () => Promise<void>
   subscribe: (cb: Subscriber) => () => void
+  attachVideo: (el: HTMLVideoElement | null) => void
 }
 
 const CameraContext = createContext<CameraContextValue | null>(null)
@@ -36,14 +37,28 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false)
   const [isInitializing, setIsInitializing] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handsRef = useRef<any>(null)
-  const sourceVideoRef = useRef<HTMLVideoElement | null>(null)
+  // The video element we read frames from. Registered by HandCamera via
+  // attachVideo() so MediaPipe reads from an on-screen, actively-rendering
+  // element. Earlier we used a 1×1 off-screen video here, but iOS Safari (and
+  // some Android battery-saver modes) throttle/pause hidden video decoding,
+  // which silently starves the model — readyState reports OK, send() doesn't
+  // throw, but onResults gets stale/black frames so detections never fire.
+  const videoElRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const animFrameRef = useRef<number>(0)
   const lastFrameTime = useRef(0)
   const initStartedRef = useRef(false)
   const subscribersRef = useRef<Set<Subscriber>>(new Set())
-  const stabilizers = useRef([new FingerStabilizer(5), new FingerStabilizer(5)])
+  // Mobile cameras hand the model noisier frames, so we accept a 1-frame
+  // outlier in the 5-frame window. Desktop stays strict — the full model at
+  // 30fps is consistent enough that majority-voting would just slow lock-in.
+  const stabilizers = useRef([
+    new FingerStabilizer(5, isMobile ? 1 : 0),
+    new FingerStabilizer(5, isMobile ? 1 : 0),
+  ])
 
   const subscribe = useCallback((cb: Subscriber) => {
     subscribersRef.current.add(cb)
@@ -52,38 +67,85 @@ export function CameraProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const startFrameLoop = useCallback(() => {
+    if (animFrameRef.current) return
+    const frameInterval = 1000 / (isMobile ? 24 : 30)
+    const tick = async (timestamp: number) => {
+      animFrameRef.current = requestAnimationFrame(tick)
+      if (timestamp - lastFrameTime.current < frameInterval) return
+      lastFrameTime.current = timestamp
+      const el = videoElRef.current
+      if (el && el.readyState >= 2 && handsRef.current) {
+        try {
+          await handsRef.current.send({ image: el })
+        } catch {
+          // ignore frame errors
+        }
+      }
+    }
+    animFrameRef.current = requestAnimationFrame(tick)
+  }, [])
+
+  const stopFrameLoop = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current)
+      animFrameRef.current = 0
+    }
+  }, [])
+
+  // HandCamera registers/deregisters its visible <video> here. We start the
+  // frame loop the moment we have both an element AND a loaded model — order
+  // doesn't matter (init may finish before HandCamera mounts, or vice versa).
+  const attachVideo = useCallback((el: HTMLVideoElement | null) => {
+    videoElRef.current = el
+    if (!el) {
+      stopFrameLoop()
+      return
+    }
+    if (handsRef.current) startFrameLoop()
+  }, [startFrameLoop, stopFrameLoop])
+
   const init = useCallback(async () => {
     if (initStartedRef.current) return
     initStartedRef.current = true
     setIsInitializing(true)
+    setError(null)
 
-    // Hidden source video used by MediaPipe to read frames. Kept off-screen
-    // so the public BattlePage video can be styled / positioned independently.
-    const sourceVideo = document.createElement("video")
-    sourceVideo.muted = true
-    sourceVideo.playsInline = true
-    sourceVideo.autoplay = true
-    Object.assign(sourceVideo.style, {
-      position: "fixed",
-      width: "1px",
-      height: "1px",
-      left: "-9999px",
-      top: "-9999px",
-      opacity: "0",
-      pointerEvents: "none",
-    })
-    document.body.appendChild(sourceVideo)
-    sourceVideoRef.current = sourceVideo
+    // Camera APIs are gated to secure contexts. On a LAN-served dev build
+    // without a trusted cert, mediaDevices is undefined and getUserMedia will
+    // throw a generic TypeError that's hard to diagnose on a phone — surface
+    // the real reason up front.
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setError(
+        "Camera requires HTTPS. Open this page over https:// and trust the dev certificate on this device."
+      )
+      setIsInitializing(false)
+      initStartedRef.current = false
+      return
+    }
 
     try {
+      // Dynamic import keeps the ~3MB @mediapipe/hands bundle out of the
+      // initial page load. Connect and lobby pages render before the user
+      // ever needs the camera, so making them pay for the model upfront is
+      // pure waste on mobile networks.
+      const { Hands } = await import("@mediapipe/hands")
       const hands = new Hands({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
       })
       hands.setOptions({
         maxNumHands: 2,
-        modelComplexity: isMobile ? 0 : 1,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6,
+        // The "lite" model (0) is significantly noisier than the full model
+        // and that noise interacts badly with the FingerStabilizer's strict
+        // consecutive-match rule, especially at low FPS. Modern phones can
+        // handle the full model at the resolutions/framerates we run at.
+        modelComplexity: 1,
+        // Slightly lower thresholds on mobile: phone front cameras give the
+        // model dimmer/noisier frames, and the default 0.6 floor causes the
+        // model to drop landmarks mid-gesture, which the stabilizer then
+        // interprets as a hand-leaving-frame and hard-resets the lock.
+        minDetectionConfidence: isMobile ? 0.5 : 0.6,
+        minTrackingConfidence: isMobile ? 0.5 : 0.6,
       })
 
       hands.onResults((results: any) => {
@@ -113,34 +175,37 @@ export function CameraProvider({ children }: { children: ReactNode }) {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          width:  { ideal: isMobile ? 320 : 640 },
-          height: { ideal: isMobile ? 240 : 360 },
+          // 320x240 starved the model on phones; 480x360 is the smallest
+          // resolution where landmark accuracy stays close to desktop.
+          width:  { ideal: isMobile ? 480 : 640 },
+          height: { ideal: isMobile ? 360 : 360 },
         },
       })
-      sourceVideo.srcObject = mediaStream
-      await sourceVideo.play()
+      streamRef.current = mediaStream
       setStream(mediaStream)
 
-      // Throttle to 15fps mobile / 30fps desktop
-      const frameInterval = 1000 / (isMobile ? 15 : 30)
-
-      const processFrame = async (timestamp: number) => {
-        animFrameRef.current = requestAnimationFrame(processFrame)
-        if (timestamp - lastFrameTime.current < frameInterval) return
-        lastFrameTime.current = timestamp
-        if (sourceVideo.readyState >= 2 && handsRef.current) {
-          try {
-            await handsRef.current.send({ image: sourceVideo })
-          } catch {
-            // ignore frame errors
-          }
-        }
-      }
-      animFrameRef.current = requestAnimationFrame(processFrame)
+      // If HandCamera is already mounted (e.g. user landed straight on
+      // /battle), kick the frame loop now. Otherwise it'll start when
+      // attachVideo() runs.
+      if (videoElRef.current) startFrameLoop()
 
       setIsReady(true)
     } catch (err) {
       console.error("Camera/MediaPipe init failed:", err)
+      const name = (err as { name?: string })?.name
+      let message: string
+      if (name === "NotAllowedError") {
+        message = "Camera permission was denied. Allow camera access in your browser settings and reload."
+      } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+        message = "No usable camera was found on this device."
+      } else if (name === "NotReadableError") {
+        message = "Camera is in use by another app. Close other apps using the camera and reload."
+      } else if (name === "SecurityError") {
+        message = "Camera access blocked by the browser. Make sure the page is loaded over a trusted https:// URL."
+      } else {
+        message = (err as { message?: string })?.message || "Camera failed to start."
+      }
+      setError(message)
       // Allow a retry on next call
       initStartedRef.current = false
     } finally {
@@ -151,21 +216,17 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   // Tear down on full app unmount only
   useEffect(() => {
     return () => {
-      cancelAnimationFrame(animFrameRef.current)
-      if (stream) stream.getTracks().forEach((t) => t.stop())
+      stopFrameLoop()
+      streamRef.current?.getTracks().forEach((t) => t.stop())
       if (handsRef.current) {
         try { handsRef.current.close() } catch { /* ignore */ }
-      }
-      if (sourceVideoRef.current) {
-        sourceVideoRef.current.srcObject = null
-        sourceVideoRef.current.remove()
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
-    <CameraContext.Provider value={{ isReady, isInitializing, stream, init, subscribe }}>
+    <CameraContext.Provider value={{ isReady, isInitializing, stream, error, init, subscribe, attachVideo }}>
       {children}
     </CameraContext.Provider>
   )
