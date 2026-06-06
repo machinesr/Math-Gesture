@@ -8,7 +8,7 @@ export type Player = {
   rank?: number
 }
 
-export type RoomStatus = "waiting" | "playing" | "finished"
+export type RoomStatus = "lobby" | "playing" | "finished"
 
 export type RoomData = {
   pin: string | number

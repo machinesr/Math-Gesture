@@ -12,7 +12,12 @@ export function useLobby() {
   // ConnectPage when the user first connects. No need to do it here.
 
   useEffect(() => {
-    const onLobbyUpdated = (data: any) => setRoomData(data)
+    const onLobbyUpdated = (data: any) => {
+      setRoomData(data)
+      if (data?.status === "playing") {
+        navigate("/battle")
+      }
+    }
 
     const handleStartSequence = (data: any) => {
       setIsStarting(true)
