@@ -36,7 +36,7 @@ export default function ConnectPage() {
       if (loading) {
         setLoading(false)
         setRoomData(data)
-        navigate("/lobby")
+        navigate(data?.status === "playing" ? "/battle" : "/lobby")
       }
     }
 
